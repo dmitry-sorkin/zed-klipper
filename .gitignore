@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+*.wasm
+*.so
+*.dylib
+*.dll
+build/
+dist/
