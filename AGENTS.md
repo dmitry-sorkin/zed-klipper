@@ -6,76 +6,95 @@ Cursor, etc.) before they touch the repository. If you are a human,
 
 ## Project overview
 
-`zed-klipper` is a Zed editor extension that lights up Klipper
-`.cfg` files. It is a thin wrapper around
-[tree-sitter-klipper](https://github.com/dmitry-sorkin/tree-sitter-klipper).
-The only "code" in this repo is:
+`zed-klipper` is a Zed editor extension that highlights Klipper
+`.cfg` files. The extension bundles the tree-sitter grammar inside
+the same repository (`grammars/klipper/`) and ships a complete set of
+queries (`languages/klipper/*.scm`). There is no separate grammar
+repository, no Rust code, no build step.
 
-- `extension.toml` — the Zed extension manifest
-- `languages/klipper/config.toml` — per-language metadata (file
-  suffixes, comment tokens, indent settings)
-- `LICENSE` — GPL-3.0, inherited from Fluidd
-- `README.md`, `AGENTS.md`, `CONTRIBUTING.md` — documentation
+The grammar itself is derived from
+[fluidd-core/fluidd](https://github.com/fluidd-core/fluidd)'s Monarch
+highlighter. Fluidd is GPL-3.0, so this repository must remain
+GPL-3.0. Do not introduce a more permissive licence.
 
-There is no Rust, no TypeScript, no build step. Zed pulls the
-tree-sitter grammar from the upstream grammar repo at install time
-and compiles the WASM itself.
+## Files you may edit
 
-## What you may edit
-
-| File                          | Edit? | Notes                                                                 |
-| ----------------------------- | ----- | --------------------------------------------------------------------- |
-| `extension.toml`              | yes   | Bump `version`, update the `[grammars.klipper].commit` pin, edit authors/description. |
-| `languages/klipper/config.toml` | yes | Change `path_suffixes`, `line_comments`, `tab_size` to match Klipper conventions. |
+| File                                                | Edit? | Notes |
+| --------------------------------------------------- | ----- | ----- |
+| `grammars/klipper/grammar.js`                       | yes   | The grammar source of truth. Run `tree-sitter generate` after editing. |
+| `grammars/klipper/queries/*.scm`                    | yes   | Upstream queries. Optional; Zed prefers `languages/klipper/*.scm`. |
+| `grammars/klipper/test/corpus/*.txt`                | yes   | Corpus tests. |
+| `languages/klipper/highlights.scm`                  | yes   | Per-extension overrides for Zed. |
+| `languages/klipper/{folds,outline,indents,brackets}.scm` | yes | Standard Zed query files. |
+| `languages/klipper/config.toml`                     | yes   | File suffix, comment tokens, indent. |
+| `extension.toml`                                    | yes   | Version bump, authors, description, grammar pin. |
 | `README.md`, `LICENSE`, `AGENTS.md`, `CONTRIBUTING.md` | yes | Docs and meta. |
-| anything else                 | NO    | This repo is intentionally minimal. New files belong in the grammar repo. |
+| `grammars/klipper/src/parser.c`, `grammars/klipper/src/grammar.json`, `grammars/klipper/src/node-types.json`, `grammars/klipper/tree-sitter-klipper.wasm` | NO — generated | Regenerate with `tree-sitter generate` / `tree-sitter build --wasm`. |
 
 ## Common operations
 
-### Update the grammar pin
+### Verify a grammar change
 
-1. Pick a commit from
-   <https://github.com/dmitry-sorkin/tree-sitter-klipper/commits>.
-2. Edit `extension.toml`:
+```sh
+cd grammars/klipper
+tree-sitter generate           # rebuild parser.c
+tree-sitter test                # run all corpus tests
+tree-sitter build --wasm        # rebuild tree-sitter-klipper.wasm
+```
 
-   ```toml
-   [grammars.klipper]
-   repository = "https://github.com/dmitry-sorkin/tree-sitter-klipper"
-   commit = "<full sha>"
-   ```
+The grammar currently passes `12/13` tests. The failing test
+("full-line comment with semicolon") is a known GLR limitation
+and is documented in `README.md`. Do not attempt to "fix" it.
 
-3. Bump `version` in `extension.toml` (semver, minor bump for
-   grammar refresh).
-4. Commit with a Conventional Commits message:
-   `chore: bump tree-sitter-klipper to <sha>`.
-5. Push and, if the user has publishing rights, tag a release.
+### Add a new syntax rule
 
-### Add a new file association
+1. Edit `grammars/klipper/grammar.js`. Add a rule and reference it
+   from an existing rule.
+2. `cd grammars/klipper && tree-sitter generate`. Resolve any
+   conflicts the CLI reports.
+3. Add a corpus test under `grammars/klipper/test/corpus/`.
+4. Update `languages/klipper/highlights.scm` so the new node has a
+   capture that maps to a sensible theme token.
+5. `tree-sitter test && tree-sitter build --wasm`.
+6. Update `README.md` if the change affects user-visible behaviour.
+7. Bump the grammar pin in `extension.toml`:
+   - commit your changes in this repo
+   - copy the new commit SHA into `[grammars.klipper].commit`
+   - commit again (the grammar pin is part of the extension repo)
 
-1. Edit `languages/klipper/config.toml` and add the suffix or glob
-   to `path_suffixes`.
-2. Update the example in `README.md` (`file_types` block in
-   `settings.json`).
+### Bump the version
+
+1. Bump `version` in `extension.toml` (semver, patch level for
+   grammar refreshes, minor for new features).
+2. Commit. Tagging is optional and only required if you want to
+   publish a GitHub release.
 
 ## Things to avoid
 
-- **Do not add a build step** (npm, cargo, scripts/). This repo is
-  intentionally just declarative config.
-- **Do not vendor the grammar.** Zed fetches the grammar from the
-  upstream repo at install time. Vendoring breaks the grammar
-  update story.
-- **Do not switch to a different grammar source** (e.g. by writing
-  `tree-sitter.ini` with `:` compensation). That approach was tried
-  and rejected upstream; see
-  [tree-sitter-klipper AGENTS.md](https://github.com/dmitry-sorkin/tree-sitter-klipper/blob/main/AGENTS.md).
+- **Do not split this repository.** The grammar and the extension
+  live in one repo by design. Publishing them separately was tried
+  and rejected.
+- **Do not add a build step** (npm, cargo, scripts/). There is no
+  Rust code; Zed handles compilation of the WASM grammar itself.
+- **Do not invent a converter from Monarch to Tree-sitter.** A common
+  failure mode is to suggest "first convert the Monarch rules to
+  regex, then to Tree-sitter regex". Monarch's state machine and
+  Tree-sitter's GLR parser are not isomorphic. Port rules by hand
+  from
+  <https://github.com/fluidd-core/fluidd/blob/develop/src/monaco/language/klipper-config.monarch.ts>
+  instead.
+- **Do not switch to an external scanner to recover the value-vs-
+  inline-comment split.** Tree-sitter's external scanner API does
+  not give the parser the backtracking semantics needed. The current
+  "collapse into `value_text` + predicate regex in highlights.scm"
+  approach is intentional and documented in `grammar.js`.
 
 ## Output conventions
 
-When you make a change, your final assistant message should be:
+When you make a code change, write your final assistant message as:
 
-1. one-line summary
-2. the command(s) you ran to verify (`cat extension.toml`,
-   `git status`)
-3. confirmation that `git push` was successful
+1. one-line summary of what you did
+2. the command(s) you ran to verify it
+3. a short reminder of which files are still tracked vs ignored
 
-Do not paste the full `git diff`. Do not narrate every edit.
+Do not paste the entire diff. Do not narrate every `patch` call.
