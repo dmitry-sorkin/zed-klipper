@@ -14,5 +14,5 @@ license = "GPL-3.0"
 # silently break the extension.
 [grammars.klipper]
 repository = "https://github.com/dmitry-sorkin/zed-klipper"
-commit = "113a2bb68ec92d7fc15f093e6f92106c9bd45201"
+commit = "v0.1.0"
 path = "grammars/klipper"
