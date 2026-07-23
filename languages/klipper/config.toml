@@ -4,10 +4,12 @@ path_suffixes = ["cfg"]
 line_comments = ["# ", "; "]
 autoclose_before = ":.,=}])>"
 brackets = [
-    { start = "[", end = "]", close = true, newline = true },
-    { start = '"', end = '"', close = true, newline = false, not_in = [
-        "string",
-        "comment",
-    ] },
+  { start = "[", end = "]", close = true, newline = true },
+  { start = '"', end = '"', close = true, newline = false, not_in = [
+    "string",
+    "comment",
+  ] },
 ]
 tab_size = 4
+soft_wrap = "preferred_line_length"
+comment_toggle = "# "

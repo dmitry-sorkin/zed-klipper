@@ -7,6 +7,12 @@ authors = ["Dmitry Sorkin <dmitry@sorkin.com>"]
 repository = "https://github.com/dmitry-sorkin/zed-klipper"
 license = "GPL-3.0"
 
+# The grammar lives inside this same repository under
+# `grammars/klipper/`. Zed fetches the repo and looks at the
+# `path` subdirectory to find the tree-sitter grammar source.
+# `commit` pins it to a specific revision so grammar changes don't
+# silently break the extension.
 [grammars.klipper]
-repository = "https://github.com/dmitry-sorkin/tree-sitter-klipper"
-commit = "5b0166d38690acb4833ff6be615bee3175c3d638"
+repository = "https://github.com/dmitry-sorkin/zed-klipper"
+commit = "c348b6a"
+path = "grammars/klipper"
